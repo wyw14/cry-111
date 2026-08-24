@@ -90,10 +90,18 @@ func (s *Server) updateTopology(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.app.FlankPlanner.Update(input)
+	revision := s.app.FlankPlanner.Revision()
+	// Any topology change must regenerate the complete safety plan — main path,
+	// flank points and overlap sections — against the same revision. The flank
+	// planner already carries main/flank/overlap for each route; the overlap
+	// planner keeps a separate per-route plan that is validated against the
+	// route's topology revision, so it must be reconfigured here as well.
+	snapshot := s.app.FlankPlanner.Snapshot()
 	for _, definition := range s.app.Routes.Definitions() {
 		s.app.Resolver.Invalidate(definition.Name)
+		s.app.OverlapPlans.Configure(definition.Name, snapshot.Overlap[definition.Name], revision)
 	}
-	writeJSON(w, http.StatusOK, s.app.FlankPlanner.Snapshot())
+	writeJSON(w, http.StatusOK, snapshot)
 }
 
 func (s *Server) revalidateRoute(w http.ResponseWriter, r *http.Request) {

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -61,8 +62,23 @@ func (p *Planner) Snapshot() Topology {
 	return cloneTopology(p.topology)
 }
 
-func planFingerprint(_ uint64, main []string, _ []string, _ []string) string {
-	parts := append([]string(nil), main...)
+// Revision returns the current topology revision. It is used to regenerate
+// dependent safety plans (overlap / flank) as a single atomic unit whenever
+// the topology changes, so that main path, flank protection and overlap share
+// one consistent revision stamp.
+func (p *Planner) Revision() uint64 {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.topology.Revision
+}
+
+func planFingerprint(revision uint64, main []string, flank []string, overlap []string) string {
+	parts := make([]string, 0, len(main)+len(flank)+len(overlap)+1)
+	parts = append(parts, strconv.FormatUint(revision, 10))
+	parts = append(parts, append([]string(nil), main...)...)
+	parts = append(parts, append([]string(nil), flank...)...)
+	parts = append(parts, append([]string(nil), overlap...)...)
+	sort.Strings(parts)
 	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
 	return hex.EncodeToString(sum[:])
 }

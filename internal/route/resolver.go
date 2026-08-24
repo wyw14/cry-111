@@ -37,5 +37,7 @@ func (r *Resolver) Resolve(route model.Route) model.Route {
 }
 
 func (r *Resolver) Invalidate(routeName string) {
-	_ = routeName
+	r.mu.Lock()
+	delete(r.cache, routeName)
+	r.mu.Unlock()
 }
